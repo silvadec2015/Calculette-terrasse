@@ -92,6 +92,7 @@
       couleurId: "brun-colorado",
       lambourdeCouleur: "brune",
       jointType: defaultJointType(surface),
+      jointTypeTouched: false,
       fixation: "clips",
       habillage: "jupe",
       ventilation: false,
@@ -573,6 +574,7 @@
           break;
         case "select-joint":
           state.jointType = btn.getAttribute("data-joint");
+          state.jointTypeTouched = true;
           render();
           break;
         case "select-fixation":
@@ -599,6 +601,7 @@
         var v = parseFloat(t.value);
         state.surface = isNaN(v) ? 0 : clamp(v, 0, 2000);
         state.perimetre = estimatePerimetre(state.surface);
+        if (!state.jointTypeTouched) state.jointType = defaultJointType(state.surface);
       } else if (t.matches('[data-field="perimetre"]')) {
         var vp = parseFloat(t.value);
         state.perimetre = isNaN(vp) ? 0 : clamp(vp, 0, 2000);
