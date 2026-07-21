@@ -66,20 +66,32 @@ d'iframe côté site (non fournie ici, pour rester sans dépendance).
 ## Récupération des demandes de devis
 
 Le widget n'a **aucun backend**. À l'étape 5, quand l'utilisateur valide le
-formulaire :
+formulaire, trois choses se produisent :
 
-1. Si l'option `onQuoteRequest` a été passée à `mount()`, elle est appelée
-   avec le récapitulatif complet (dimensions, produit choisi, liste de
-   matériaux, total, coordonnées).
-2. Dans tous les cas, un événement `silvadec:quote-request` est déclenché
-   (`bubbles: true`) sur l'élément monté ET sur `window`, avec le même
-   payload dans `event.detail`. C'est le point d'intégration à utiliser
-   pour brancher le CRM/formulaire de contact existant du site (appel API,
-   Google Tag Manager, etc.).
+1. **Un email pré-rempli s'ouvre automatiquement** dans le client mail par
+   défaut du visiteur (via un lien `mailto:`), adressé à
+   **`question@silvadec.com`**, avec en corps de message le récapitulatif
+   complet (dimensions, produit choisi, liste de matériaux avec quantités
+   et prix, total estimatif, coordonnées du client). L'écran de
+   confirmation affiche aussi un lien cliquable de secours, au cas où
+   l'ouverture automatique soit bloquée par le navigateur ou qu'aucun
+   client mail ne soit configuré sur l'appareil (fréquent sur mobile).
+   Pour changer l'adresse de destination : attribut `data-contact-email`
+   sur le conteneur, ou option `contactEmail` passée à `mount()`.
+2. Si l'option `onQuoteRequest` a été passée à `mount()`, elle est appelée
+   avec le récapitulatif complet.
+3. Un événement `silvadec:quote-request` est déclenché (`bubbles: true`)
+   sur l'élément monté ET sur `window`, avec le même payload dans
+   `event.detail`.
 
-**Il faut câbler l'un de ces deux mécanismes côté site pour que les demandes
-de devis soient effectivement transmises à un conseiller** — sans cela,
-les demandes ne sont ni envoyées ni stockées nulle part.
+**Limite à connaître :** le `mailto:` dépend du client mail du visiteur —
+il doit lui-même cliquer sur « Envoyer » dans son application, et rien ne
+part si son appareil n'a pas de messagerie configurée (cas fréquent sur
+certains mobiles/navigateurs). Pour un envoi garanti et silencieux (sans
+action du visiteur), il faudra brancher un petit backend ou un service de
+formulaire tiers (Formspree, EmailJS, endpoint WordPress, etc.) via
+`onQuoteRequest` ou l'événement `silvadec:quote-request` — voir l'exemple
+`fetch()` ci-dessus.
 
 ## Mettre à jour le tarif
 

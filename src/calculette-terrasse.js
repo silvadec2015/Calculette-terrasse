@@ -23,6 +23,7 @@
   var DATA = global.SILVADEC_DATA;
   var EUR = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
   var instanceCounter = 0;
+  var DEFAULT_CONTACT_EMAIL = "question@silvadec.com";
 
   function fmt(n) { return EUR.format(round2(n)); }
   function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
@@ -40,6 +41,34 @@
   function getFinition(largeurObj, id) { return largeurObj.finitions.filter(function (f) { return f.id === id; })[0]; }
   function getCouleur(finition, id) { return finition.couleurs.filter(function (c) { return c.id === id; })[0]; }
   function getLambourde(id) { return DATA.lambourdes.filter(function (l) { return l.id === id; })[0]; }
+
+  function buildMailtoUrl(payload, contactEmail) {
+    var d = payload.dimensions, p = payload.produit, c = payload.contact;
+    var lines = [
+      "Nouvelle demande de devis via la Calculette Terrasse Silvadec",
+      "",
+      "Dimensions : " + d.longueur + " x " + d.largeur + " m (" + d.surface + " m²)",
+      "Terrasse couverte / abritée : " + (d.terrasseCouverte ? "oui" : "non"),
+      "Produit : " + p.gamme + " " + p.finition + " " + p.largeurMm + "mm " + p.couleur + " (" + p.code + ")",
+      "",
+      "Matériel estimé :"
+    ];
+    payload.materiaux.forEach(function (l) {
+      lines.push("- " + l.quantite + " " + l.unite + " " + l.designation + " (" + l.code + ") — " + fmt(l.prixTotal));
+    });
+    lines.push("");
+    lines.push("Total estimatif : " + fmt(payload.total));
+    lines.push("");
+    lines.push("Coordonnées du client :");
+    lines.push("Nom : " + c.nom);
+    lines.push("Email : " + c.email);
+    lines.push("Téléphone : " + (c.telephone || "-"));
+    lines.push("Code postal : " + (c.codePostal || "-"));
+    lines.push("Message : " + (c.message || "-"));
+
+    var subject = "Demande de devis Calculette Terrasse (" + d.surface + " m²)";
+    return "mailto:" + contactEmail + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(lines.join("\n"));
+  }
 
   function defaultState() {
     return {
@@ -368,7 +397,8 @@
     if (state.submitted) {
       return '<div class="ct-panel ct-confirmation">' +
         "<h3>Merci !</h3>" +
-        "<p>Votre demande a bien été enregistrée. Un conseiller Silvadec revient vers vous rapidement.</p>" +
+        "<p>Votre messagerie a dû s'ouvrir avec un email pré-rempli à destination de <strong>" + esc(state.lastContactEmail) + "</strong> : il ne vous reste qu'à cliquer sur Envoyer.</p>" +
+        '<p class="ct-hint">Rien ne s\'est ouvert ? <a href="' + esc(state.lastMailto) + '">Cliquez ici pour ouvrir l\'email</a>.</p>' +
         '<button type="button" class="ct-btn ct-btn--secondary" data-action="reset">Faire une nouvelle simulation</button>' +
         "</div>";
     }
@@ -454,6 +484,8 @@
         return;
       }
       var payload = buildQuotePayload();
+      var contactEmail = options.contactEmail || DEFAULT_CONTACT_EMAIL;
+      var mailtoUrl = buildMailtoUrl(payload, contactEmail);
 
       if (typeof options.onQuoteRequest === "function") {
         options.onQuoteRequest(payload);
@@ -470,7 +502,10 @@
       global.dispatchEvent(evt);
 
       state.submitted = true;
+      state.lastMailto = mailtoUrl;
+      state.lastContactEmail = contactEmail;
       render();
+      global.location.href = mailtoUrl;
     }
 
     root.addEventListener("click", function (e) {
