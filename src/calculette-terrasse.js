@@ -351,11 +351,11 @@
 
     Object.keys(parCategorie).forEach(function (cat) {
       html += '<h4 class="ct-cat-title">' + esc(cat) + "</h4>";
-      html += '<table class="ct-table"><thead><tr><th>Désignation</th><th>Réf.</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead><tbody>';
+      html += '<div class="ct-table-wrap"><table class="ct-table"><thead><tr><th>Désignation</th><th>Réf.</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead><tbody>';
       parCategorie[cat].forEach(function (l) {
         html += "<tr><td>" + esc(l.designation) + "</td><td>" + esc(l.code) + "</td><td>" + l.quantite + " " + esc(l.unite) + "</td><td>" + fmt(l.prixUnitaire) + "</td><td>" + fmt(l.prixTotal) + "</td></tr>";
       });
-      html += "</tbody></table>";
+      html += "</tbody></table></div>";
     });
 
     html += '<p class="ct-total">Total estimatif : <strong>' + fmt(r.total) + "</strong></p>";
