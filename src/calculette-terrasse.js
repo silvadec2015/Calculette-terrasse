@@ -42,12 +42,19 @@
   function getCouleur(finition, id) { return finition.couleurs.filter(function (c) { return c.id === id; })[0]; }
   function getLambourde(id) { return DATA.lambourdes.filter(function (l) { return l.id === id; })[0]; }
 
+  // Sans longueur/largeur saisies séparément, on estime le périmètre et le nombre
+  // de rangées de lames en assimilant la terrasse à un carré de même surface.
+  // Cette estimation est affichée et modifiable à l'étape 3 pour les postes qui en dépendent
+  // (habillage périphérique, grilles de ventilation).
+  function estimatePerimetre(surface) { return round2(4 * Math.sqrt(Math.max(0, surface))); }
+  function defaultJointType(surface) { return Math.sqrt(Math.max(0, surface)) > 4 ? "lambourdeDoublee" : "aucun"; }
+
   function buildMailtoUrl(payload, contactEmail) {
     var d = payload.dimensions, p = payload.produit, c = payload.contact;
     var lines = [
       "Nouvelle demande de devis via la Calculette Terrasse Silvadec",
       "",
-      "Dimensions : " + d.longueur + " x " + d.largeur + " m (" + d.surface + " m²)",
+      "Surface : " + d.surface + " m²",
       "Terrasse couverte / abritée : " + (d.terrasseCouverte ? "oui" : "non"),
       "Produit : " + p.gamme + " " + p.finition + " " + p.largeurMm + "mm " + p.couleur + " (" + p.code + ")",
       "",
@@ -71,11 +78,12 @@
   }
 
   function defaultState() {
+    var surface = 12;
     return {
       step: 1,
       submitted: false,
-      longueur: 4,
-      largeur: 3,
+      surface: surface,
+      perimetre: estimatePerimetre(surface),
       covered: false,
       chutePct: 10,
       gammeId: "elegance",
@@ -83,7 +91,7 @@
       finitionId: "lisse",
       couleurId: "brun-colorado",
       lambourdeCouleur: "brune",
-      jointType: "lambourdeDoublee",
+      jointType: defaultJointType(surface),
       fixation: "clips",
       habillage: "jupe",
       ventilation: false,
@@ -101,7 +109,7 @@
     var finition = getFinition(largeurObj, state.finitionId);
     var couleur = getCouleur(finition, state.couleurId);
 
-    var surface = round2(Math.max(0, state.longueur) * Math.max(0, state.largeur));
+    var surface = round2(Math.max(0, state.surface));
     var lignes = [];
     var alertes = [];
 
@@ -145,11 +153,15 @@
       prixTotal: prixLambourdes
     });
 
-    // Nombre de rangées de lames (utile pour clips début/fin et aboutages)
+    // Sans longueur/largeur distinctes, on assimile la terrasse à un carré de même
+    // surface pour estimer le nombre de rangées de lames (utile pour les clips
+    // début/fin et les aboutages). Cette approximation est indépendante de la forme
+    // réelle et reste cohérente avec le périmètre estimé/ajusté ci-dessous.
     var pasLameM = (state.largeurMm + regles.jeuLargeurMm) / 1000;
-    var nbRangees = Math.ceil(state.largeur / pasLameM);
-    var lamesParRangee = Math.ceil(state.longueur / regles.longueurStandardLameM);
-    var nbAboutages = nbRangees * Math.max(0, lamesParRangee - 1);
+    var coteEstime = Math.sqrt(surface);
+    var nbRangees = Math.max(1, Math.ceil(coteEstime / pasLameM));
+    var nbAboutages = Math.max(0, nbLames - nbRangees);
+    var jonctionNecessaire = coteEstime > regles.longueurStandardLameM;
 
     // Fixation
     var clipsParM2 = regles.clipsParM2[state.largeurMm];
@@ -185,8 +197,8 @@
       lignes.push({ categorie: "Fixation", designation: vis.nom, code: vis.code, quantite: nbBlisters, unite: "blister(s)", prixUnitaire: vis.prix, prixTotal: nbBlisters * vis.prix });
     }
 
-    // Habillage périphérique
-    var perimetre = 2 * (state.longueur + state.largeur);
+    // Habillage périphérique (périmètre estimé pour une terrasse carrée, ajustable à l'étape 3)
+    var perimetre = state.perimetre > 0 ? state.perimetre : estimatePerimetre(surface);
     if (state.habillage === "jupe") {
       var jupe = gamme.jupe.filter(function (j) { return j.id === couleur.id; })[0];
       if (jupe) {
@@ -210,7 +222,8 @@
     // Ventilation périphérique (optionnelle)
     if (state.ventilation) {
       var g = DATA.grilleVentilation;
-      var nbGrilles = Math.max(2, 2 * Math.ceil(state.largeur / g.longueur));
+      var longueurVentilee = perimetre / 2;
+      var nbGrilles = Math.max(2, Math.ceil(longueurVentilee / g.longueur));
       lignes.push({ categorie: "Ventilation", designation: g.nom, code: g.code, quantite: nbGrilles, unite: "pièce(s)", prixUnitaire: g.prix, prixTotal: nbGrilles * g.prix });
     }
 
@@ -227,8 +240,10 @@
     if (surface > 30 && !state.ventilation) {
       alertes.push("Terrasse de plus de 30 m² : Silvadec recommande d'ajouter des grilles de ventilation en périphérie (option disponible à l'étape précédente).");
     }
-    if (nbAboutages > 0 && state.jointType !== "clipAboutage") {
-      alertes.push("Votre longueur de terrasse dépasse 4 m : des lambourdes doublées ont été ajoutées aux jonctions de lames, conformément à la notice de pose.");
+    if (jonctionNecessaire && state.jointType === "aucun") {
+      alertes.push("Au-delà de 4 m dans un sens, les lames doivent être aboutées : choisissez « Lambourdes doublées » ou « Clips d'aboutage » à l'étape précédente.");
+    } else if (jonctionNecessaire && state.jointType === "lambourdeDoublee") {
+      alertes.push("Des lambourdes doublées ont été ajoutées aux jonctions de lames, conformément à la notice de pose.");
     }
 
     return {
@@ -265,15 +280,10 @@
   }
 
   function renderStep1(state) {
-    var surface = round2(Math.max(0, state.longueur) * Math.max(0, state.largeur));
     return '<div class="ct-panel">' +
-      "<h3>Les dimensions de votre terrasse</h3>" +
-      '<p class="ct-hint">Longueur = sens de pose des lames. Largeur = perpendiculaire. Terrasse rectangulaire simple ; pour une forme complexe, contactez un conseiller Silvadec.</p>' +
-      '<div class="ct-field-row">' +
-      '<label class="ct-field"><span>Longueur (m)</span><input type="number" min="0.5" max="50" step="0.1" data-field="longueur" value="' + state.longueur + '"></label>' +
-      '<label class="ct-field"><span>Largeur (m)</span><input type="number" min="0.5" max="50" step="0.1" data-field="largeur" value="' + state.largeur + '"></label>' +
-      "</div>" +
-      '<p class="ct-surface-live">Surface : <strong data-live="surface">' + surface.toLocaleString("fr-FR") + "</strong> m²</p>" +
+      "<h3>La surface de votre terrasse</h3>" +
+      '<p class="ct-hint">Terrasse rectangulaire simple ; pour une forme complexe (angles, découpes), contactez un conseiller Silvadec pour un devis sur mesure.</p>' +
+      '<label class="ct-field"><span>Surface (m²)</span><input type="number" min="1" max="1000" step="0.5" data-field="surface" value="' + state.surface + '"></label>' +
       '<label class="ct-field"><span>Marge de chute / découpes (%)</span><input type="range" min="0" max="25" step="1" data-field="chutePct" value="' + state.chutePct + '"><output data-live="chutePct">' + state.chutePct + "%</output></label>" +
       '<label class="ct-checkbox"><input type="checkbox" data-field="covered" ' + (state.covered ? "checked" : "") + '> Terrasse couverte ou semi-abritée (véranda, pergola pleine, balcon couvert...)</label>' +
       "</div>";
@@ -320,7 +330,7 @@
     var gamme = getGamme(state.gammeId);
     var largeurObj = getLargeur(gamme, state.largeurMm);
     var hasPlanche = largeurObj.plancheFinition.length > 0;
-    var longueurDepasse4m = state.longueur > 4;
+    var perimetreNecessaire = state.habillage !== "aucun" || state.ventilation;
 
     var html = '<div class="ct-panel"><h3>Structure, fixation et finitions</h3>';
 
@@ -329,11 +339,15 @@
       '<button type="button" class="ct-toggle__btn' + (state.lambourdeCouleur === "anthracite" ? " is-selected" : "") + '" data-action="select-lambourde" data-lambourde="anthracite">Gris anthracite</button>' +
       "</div></div>";
 
-    if (longueurDepasse4m) {
-      html += '<div class="ct-field"><span>Jonction des lames (longueur &gt; 4 m)</span><div class="ct-toggle">' +
-        '<button type="button" class="ct-toggle__btn' + (state.jointType === "lambourdeDoublee" ? " is-selected" : "") + '" data-action="select-joint" data-joint="lambourdeDoublee">Lambourdes doublées</button>' +
-        '<button type="button" class="ct-toggle__btn' + (state.jointType === "clipAboutage" ? " is-selected" : "") + '" data-action="select-joint" data-joint="clipAboutage">Clips d\'aboutage</button>' +
-        "</div></div>";
+    html += '<div class="ct-field"><span>Jonction des lames (si la terrasse dépasse 4 m dans un sens)</span><div class="ct-toggle">' +
+      '<button type="button" class="ct-toggle__btn' + (state.jointType === "aucun" ? " is-selected" : "") + '" data-action="select-joint" data-joint="aucun">Aucune (terrasse ≤ 4 m)</button>' +
+      '<button type="button" class="ct-toggle__btn' + (state.jointType === "lambourdeDoublee" ? " is-selected" : "") + '" data-action="select-joint" data-joint="lambourdeDoublee">Lambourdes doublées</button>' +
+      '<button type="button" class="ct-toggle__btn' + (state.jointType === "clipAboutage" ? " is-selected" : "") + '" data-action="select-joint" data-joint="clipAboutage">Clips d\'aboutage</button>' +
+      "</div></div>";
+
+    if (perimetreNecessaire) {
+      html += '<label class="ct-field"><span>Périmètre de la terrasse (m)</span><input type="number" min="1" max="400" step="0.1" data-field="perimetre" value="' + state.perimetre + '"></label>' +
+        '<p class="ct-hint">Estimé automatiquement pour une terrasse carrée d\'environ ' + round2(Math.sqrt(state.surface)) + ' m de côté à partir de votre surface. Ajustez cette valeur si votre terrasse est plus rectangulaire, pour un habillage/une ventilation plus précis.</p>';
     }
 
     html += '<div class="ct-field"><span>Type de fixation</span><div class="ct-toggle">' +
@@ -456,7 +470,7 @@
 
     function isStepValid(step) {
       if (step === 1) {
-        return state.longueur > 0 && state.largeur > 0;
+        return state.surface > 0;
       }
       return true;
     }
@@ -469,7 +483,7 @@
     function buildQuotePayload() {
       var r = compute(state);
       return {
-        dimensions: { longueur: state.longueur, largeur: state.largeur, surface: r.surface, terrasseCouverte: state.covered },
+        dimensions: { surface: r.surface, perimetreEstime: state.perimetre, terrasseCouverte: state.covered },
         produit: { gamme: r.gamme.nom, largeurMm: state.largeurMm, finition: r.finition.nom, couleur: r.couleur.nom, code: r.couleur.code },
         materiaux: r.lignes,
         total: r.total,
@@ -581,11 +595,13 @@
 
     root.addEventListener("input", function (e) {
       var t = e.target;
-      if (t.matches('[data-field="longueur"], [data-field="largeur"]')) {
+      if (t.matches('[data-field="surface"]')) {
         var v = parseFloat(t.value);
-        state[t.getAttribute("data-field")] = isNaN(v) ? 0 : clamp(v, 0, 100);
-        var live = root.querySelector('[data-live="surface"]');
-        if (live) live.textContent = round2(Math.max(0, state.longueur) * Math.max(0, state.largeur)).toLocaleString("fr-FR");
+        state.surface = isNaN(v) ? 0 : clamp(v, 0, 2000);
+        state.perimetre = estimatePerimetre(state.surface);
+      } else if (t.matches('[data-field="perimetre"]')) {
+        var vp = parseFloat(t.value);
+        state.perimetre = isNaN(vp) ? 0 : clamp(vp, 0, 2000);
       } else if (t.matches('[data-field="chutePct"]')) {
         state.chutePct = parseInt(t.value, 10);
         var out = root.querySelector('[data-live="chutePct"]');
