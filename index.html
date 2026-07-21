@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calculette Terrasse Silvadec</title>
+  <link rel="stylesheet" href="src/calculette-terrasse.css">
+  <style>
+    body { margin: 0; padding: 32px 16px; background: #f4f6f4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="silvadec-calculette-terrasse" data-contact-email="devis@silvadec.com"></div>
+
+  <script src="src/data.js"></script>
+  <script src="src/calculette-terrasse.js"></script>
+  <script>
+    window.addEventListener("silvadec:quote-request", function (e) {
+      console.log("Nouvelle demande de devis :", e.detail);
+    });
+  </script>
+</body>
+</html>
