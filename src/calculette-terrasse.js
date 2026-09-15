@@ -87,13 +87,13 @@
       surface: surface,
       perimetre: estimatePerimetre(surface),
       covered: false,
-      chutePct: 10,
+      chutePct: 5,
       gammeId: "elegance",
       largeurMm: 138,
       finitionId: "lisse",
       couleurId: "brun-colorado",
-      lambourdeCouleur: "brune",
-      jointType: defaultJointType(surface),
+      lambourdeCouleur: "anthracite",
+      jointType: "aucun",
       jointTypeTouched: false,
       fixation: "clips",
       habillage: "jupe",
@@ -337,16 +337,7 @@
 
     var html = '<div class="ct-panel"><h3>Structure, fixation et finitions</h3>';
 
-    html += '<div class="ct-field"><span>Couleur des lambourdes composite</span><div class="ct-toggle">' +
-      '<button type="button" class="ct-toggle__btn' + (state.lambourdeCouleur === "brune" ? " is-selected" : "") + '" data-action="select-lambourde" data-lambourde="brune">Brune</button>' +
-      '<button type="button" class="ct-toggle__btn' + (state.lambourdeCouleur === "anthracite" ? " is-selected" : "") + '" data-action="select-lambourde" data-lambourde="anthracite">Gris anthracite</button>' +
-      "</div></div>";
-
-    html += '<div class="ct-field"><span>Jonction des lames (si la terrasse dépasse 4 m dans un sens)</span><div class="ct-toggle">' +
-      '<button type="button" class="ct-toggle__btn' + (state.jointType === "aucun" ? " is-selected" : "") + '" data-action="select-joint" data-joint="aucun">Aucune (terrasse ≤ 4 m)</button>' +
-      '<button type="button" class="ct-toggle__btn' + (state.jointType === "lambourdeDoublee" ? " is-selected" : "") + '" data-action="select-joint" data-joint="lambourdeDoublee">Lambourdes doublées</button>' +
-      '<button type="button" class="ct-toggle__btn' + (state.jointType === "clipAboutage" ? " is-selected" : "") + '" data-action="select-joint" data-joint="clipAboutage">Clips d\'aboutage</button>' +
-      "</div></div>";
+    html += '<p class="ct-hint">Lambourdes composite : gris anthracite standard</p>';
 
     if (perimetreNecessaire) {
       html += '<label class="ct-field"><span>Périmètre de la terrasse (m)</span><input type="number" min="1" max="400" step="0.1" data-field="perimetre" value="' + state.perimetre + '"></label>' +
@@ -438,10 +429,18 @@
   function renderNav(state) {
     var backDisabled = state.step === 1;
     var isLast = state.step === STEP_LABELS.length;
-    return '<div class="ct-nav">' +
-      '<button type="button" class="ct-btn ct-btn--secondary" data-action="prev" ' + (backDisabled ? "disabled" : "") + ">&larr; Précédent</button>" +
-      (isLast ? "" : '<button type="button" class="ct-btn ct-btn--primary" data-action="next">Suivant &rarr;</button>') +
-      "</div>";
+    var isEstimation = state.step === 4;
+    var nav = '<div class="ct-nav">' +
+      '<button type="button" class="ct-btn ct-btn--secondary" data-action="prev" ' + (backDisabled ? "disabled" : "") + ">&larr; Précédent</button>";
+
+    if (isEstimation) {
+      nav += '<button type="button" class="ct-btn ct-btn--primary" data-action="submit-devis">Demander un devis</button>' +
+             '<button type="button" class="ct-btn ct-btn--tertiary" data-action="close-widget">Fermer</button>';
+    } else if (!isLast) {
+      nav += '<button type="button" class="ct-btn ct-btn--primary" data-action="next">Suivant &rarr;</button>';
+    }
+    nav += "</div>";
+    return nav;
   }
 
   function renderShell(state) {
@@ -570,15 +569,6 @@
           state.couleurId = btn.getAttribute("data-couleur");
           render();
           break;
-        case "select-lambourde":
-          state.lambourdeCouleur = btn.getAttribute("data-lambourde");
-          render();
-          break;
-        case "select-joint":
-          state.jointType = btn.getAttribute("data-joint");
-          state.jointTypeTouched = true;
-          render();
-          break;
         case "select-fixation":
           state.fixation = btn.getAttribute("data-fixation");
           render();
@@ -593,6 +583,9 @@
         case "reset":
           state = defaultState();
           render();
+          break;
+        case "close-widget":
+          root.innerHTML = "";
           break;
       }
     });

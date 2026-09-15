@@ -112,6 +112,8 @@
 .ct-btn--primary:hover { background: var(--ct-green-dark); }
 .ct-btn--secondary { background: #fff; border-color: var(--ct-border); color: var(--ct-ink); }
 .ct-btn--secondary:hover { background: var(--ct-green-light); }
+.ct-btn--tertiary { background: #f5f5f5; border-color: var(--ct-border); color: var(--ct-muted); }
+.ct-btn--tertiary:hover { background: #e8e8e8; }
 .ct-btn:disabled { opacity: 0.4; cursor: default; }
 
 @media (max-width: 480px) {
@@ -131,4 +133,6 @@
   .ct-widget input, .ct-widget textarea, .ct-gamme-card, .ct-toggle__btn, .ct-swatch, .ct-btn--secondary {
     background: #1e2921; color: var(--ct-ink);
   }
+  .ct-btn--tertiary { background: #252d2a; }
+  .ct-btn--tertiary:hover { background: #303a36; }
 }

@@ -186,7 +186,7 @@
               id: "brossee",
               nom: "Brossée",
               couleurs: [
-                { id: "ipe", nom: "Ipé brossé", hex: "#5a3a26", code: "B0035", prix: 69.42 },
+                { id: "nuances-ipe", nom: "Nuances Ipé", hex: "#5a3a26", code: "B0035", prix: 69.42 },
                 { id: "chene-clair", nom: "Chêne clair", hex: "#c9a876", code: "D0373", prix: 69.42 },
                 // Nuances Acacia : tarifé comme Chêne clair. Codes article à confirmer
                 // au prochain tarif Silvadec (laisser vide affiche « à confirmer »).
@@ -195,14 +195,14 @@
             }
           ],
           plancheFinition: [
-            { id: "ipe", code: "B0038", prix: 79.38 },
+            { id: "nuances-ipe", code: "B0038", prix: 79.38 },
             { id: "chene-clair", code: "D0374", prix: 79.38 },
             { id: "nuances-acacia", code: "", prix: 79.38 }
           ]
         }
       ],
       jupe: [
-        { id: "ipe", code: "B0037", prix: 25.20 },
+        { id: "nuances-ipe", code: "B0037", prix: 25.20 },
         { id: "chene-clair", code: "D0369", prix: 25.20 },
         { id: "nuances-acacia", code: "", prix: 25.20 }
       ]
@@ -210,8 +210,6 @@
   ];
 
   var LAMBOURDES = [
-    { id: "brune-3m", nom: "Lambourde composite brune 3 m", couleur: "brune", longueur: 3, code: "SILAMB0601", prix: 29.70 },
-    { id: "brune-4m", nom: "Lambourde composite brune 4 m", couleur: "brune", longueur: 4, code: "SILAMB1001L4", prix: 39.59 },
     { id: "anthracite-3m", nom: "Lambourde composite gris anthracite 3 m", couleur: "anthracite", longueur: 3, code: "SILAMB1501", prix: 28.33 },
     { id: "anthracite-4m", nom: "Lambourde composite gris anthracite 4 m", couleur: "anthracite", longueur: 4, code: "SILAMB1102", prix: 37.77 }
   ];
