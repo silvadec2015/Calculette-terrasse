@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calculette Terrasse Silvadec</title>
+  <meta name="robots" content="noindex">
+
+  <!-- Typographie corporate Silvadec (charte : Montserrat, fallback système Arial).
+       Pour éviter tout appel à Google côté visiteur (RGPD), héberger les fichiers
+       .woff2 aux côtés de ce fichier et remplacer ce bloc par un @font-face local. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap">
+
+  <link rel="stylesheet" href="src/calculette-terrasse.css">
+  <style>
+    /* Le cadre est dessiné par la page hôte : l'iframe reste transparente et sans marge. */
+    html, body { margin: 0; padding: 0; background: transparent; }
+  </style>
+</head>
+<body>
+  <!-- data-hide-header : le titre « La Calculette terrasse » et son chapô sont déjà
+       sur la page hôte, on ne les répète pas.
+       data-quote-endpoint : à renseigner pour un envoi serveur garanti ; sans lui,
+       le widget retombe sur le mailto vers question@silvadec.com. -->
+  <div id="silvadec-calculette-terrasse"
+       data-hide-header
+       data-embedded
+       data-show-close
+       data-contact-email="question@silvadec.com"></div>
+
+  <script src="src/data.js"></script>
+  <script src="src/calculette-terrasse.js"></script>
+</body>
+</html>

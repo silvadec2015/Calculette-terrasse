@@ -49,7 +49,6 @@
   // Cette estimation est affichée et modifiable à l'étape 3 pour les postes qui en dépendent
   // (habillage périphérique, grilles de ventilation).
   function estimatePerimetre(surface) { return round2(4 * Math.sqrt(Math.max(0, surface))); }
-  function defaultJointType(surface) { return Math.sqrt(Math.max(0, surface)) > 4 ? "lambourdeDoublee" : "aucun"; }
 
   function buildMailtoUrl(payload, contactEmail) {
     var d = payload.dimensions, p = payload.produit, c = payload.contact;
@@ -79,13 +78,18 @@
     return "mailto:" + contactEmail + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(lines.join("\n"));
   }
 
+  // Raccourcis de saisie de la surface : sur mobile, taper un chiffre au pouce est
+  // le premier frein du parcours, ces puces couvrent la majorité des projets.
+  var SURFACES_RAPIDES = [10, 15, 20, 30, 40];
+
   function defaultState() {
-    var surface = 12;
     return {
       step: 1,
       submitted: false,
-      surface: surface,
-      perimetre: estimatePerimetre(surface),
+      sending: false,
+      sendResult: null,
+      surface: 0,
+      perimetre: 0,
       covered: false,
       chutePct: 5,
       gammeId: "elegance",
@@ -93,8 +97,6 @@
       finitionId: "lisse",
       couleurId: "brun-colorado",
       lambourdeCouleur: "anthracite",
-      jointType: "aucun",
-      jointTypeTouched: false,
       fixation: "clips",
       habillage: "jupe",
       ventilation: false,
@@ -143,7 +145,7 @@
     var lambourdeId = state.lambourdeCouleur + "-4m";
     var lambourde = getLambourde(lambourdeId) || DATA.lambourdes[0];
     var mlLambourde = surface * regles.mlLambourdeParM2;
-    var facteurJoint = state.jointType === "lambourdeDoublee" ? 1.15 : 1;
+    var facteurJoint = Math.sqrt(surface) > regles.longueurStandardLameM ? 1.15 : 1;
     var nbLambourdes = Math.ceil((mlLambourde * facteurJoint) / lambourde.longueur);
     var prixLambourdes = nbLambourdes * lambourde.prix;
     lignes.push({
@@ -164,6 +166,9 @@
     var coteEstime = Math.sqrt(surface);
     var nbRangees = Math.max(1, Math.ceil(coteEstime / pasLameM));
     var nbAboutages = Math.max(0, nbLames - nbRangees);
+    // Au-delà de la longueur standard d'une lame, l'aboutage est imposé par la notice
+    // de pose : on double automatiquement les lambourdes aux jonctions plutôt que de
+    // demander un arbitrage au visiteur (la calculette se veut simple et rapide).
     var jonctionNecessaire = coteEstime > regles.longueurStandardLameM;
 
     // Fixation
@@ -188,11 +193,8 @@
       var nbSachetsDebutFin = Math.ceil(nbDebutFin / debutFin.qte);
       lignes.push({ categorie: "Fixation", designation: debutFin.nom, code: debutFin.code, quantite: nbSachetsDebutFin, unite: "sachet(s)", prixUnitaire: debutFin.prix, prixTotal: nbSachetsDebutFin * debutFin.prix });
 
-      if (nbAboutages > 0 && state.jointType === "clipAboutage") {
-        var abt = DATA.fixations.clipAboutage;
-        var nbSachetsAbt = Math.ceil(nbAboutages / abt.qte);
-        lignes.push({ categorie: "Fixation", designation: abt.nom, code: abt.code, quantite: nbSachetsAbt, unite: "sachet(s)", prixUnitaire: abt.prix, prixTotal: nbSachetsAbt * abt.prix });
-      }
+      // Les aboutages sont traités par lambourdes doublées (facteurJoint ci-dessus),
+      // solution retenue par défaut : pas de clips d'aboutage à chiffrer.
     } else {
       var vis = DATA.fixations.visFinition;
       var nbVis = nbIntersections * regles.visParIntersection;
@@ -243,10 +245,8 @@
     if (surface > 30 && !state.ventilation) {
       alertes.push("Terrasse de plus de 30 m² : Silvadec recommande d'ajouter des grilles de ventilation en périphérie (option disponible à l'étape précédente).");
     }
-    if (jonctionNecessaire && state.jointType === "aucun") {
-      alertes.push("Au-delà de 4 m dans un sens, les lames doivent être aboutées : choisissez « Lambourdes doublées » ou « Clips d'aboutage » à l'étape précédente.");
-    } else if (jonctionNecessaire && state.jointType === "lambourdeDoublee") {
-      alertes.push("Des lambourdes doublées ont été ajoutées aux jonctions de lames, conformément à la notice de pose.");
+    if (jonctionNecessaire) {
+      alertes.push("Votre terrasse dépasse 4 m dans un sens : les lames doivent être aboutées. Des lambourdes doublées ont été ajoutées aux jonctions, conformément à la notice de pose Silvadec.");
     }
 
     return {
@@ -270,7 +270,8 @@
   }
 
   function renderStepper(state) {
-    return '<ol class="ct-stepper">' + STEP_LABELS.map(function (label, i) {
+    var total = STEP_LABELS.length;
+    var html = '<ol class="ct-stepper">' + STEP_LABELS.map(function (label, i) {
       var n = i + 1;
       var cls = n === state.step ? "is-active" : n < state.step ? "is-done" : "";
       var clickable = n <= state.step && !state.submitted;
@@ -280,13 +281,46 @@
         '<span class="ct-stepper__label">' + esc(label) + "</span>" +
         "</button></li>";
     }).join("") + "</ol>";
+
+    // Sous 640px, les libellés du fil d'étapes ne tiennent pas : cette barre les
+    // remplace (une seule des deux est affichée, cf. media query du CSS).
+    html += '<div class="ct-progress">' +
+      '<div class="ct-progress__text">' +
+      '<span class="ct-progress__step">Étape ' + state.step + " / " + total + "</span>" +
+      '<span class="ct-progress__label">' + esc(STEP_LABELS[state.step - 1]) + "</span>" +
+      "</div>" +
+      '<span class="ct-progress__bar"><span class="ct-progress__fill" style="width:' + Math.round((state.step / total) * 100) + '%"></span></span>' +
+      "</div>";
+    return html;
+  }
+
+  // Dès qu'on connaît une surface et une lame, on sait chiffrer : afficher le total
+  // pendant que le visiteur choisit ses options tient la promesse d'« estimation
+  // rapide » de la page, au lieu de la repousser à l'étape 4.
+  function renderRunningTotal(state) {
+    if (state.step !== 2 && state.step !== 3) return "";
+    if (!(state.surface > 0)) return "";
+    var r = compute(state);
+    if (r.invalid) return "";
+    return '<div class="ct-running">' +
+      '<span class="ct-running__label">Estimation en cours</span>' +
+      '<span class="ct-running__value">' + fmt(r.total) + "</span>" +
+      '<span class="ct-running__hint">Mise à jour en direct — total TTC indicatif pour ' + r.surface.toLocaleString("fr-FR") + " m², hors pose.</span>" +
+      "</div>";
   }
 
   function renderStep1(state) {
+    var chips = SURFACES_RAPIDES.map(function (m2) {
+      var sel = state.surface === m2;
+      return '<button type="button" class="ct-chip' + (sel ? " is-selected" : "") + '" data-action="set-surface" data-surface="' + m2 + '">' + m2 + " m²</button>";
+    }).join("");
+
     return '<div class="ct-panel">' +
       "<h3>La surface de votre terrasse</h3>" +
       '<p class="ct-hint">Terrasse rectangulaire simple ; pour une forme complexe (angles, découpes), contactez un conseiller Silvadec pour un devis sur mesure.</p>' +
-      '<label class="ct-field"><span>Surface (m²)</span><input type="number" min="1" max="1000" step="0.5" data-field="surface" value="' + state.surface + '"></label>' +
+      '<label class="ct-field"><span>Surface (m²)</span>' +
+      '<input type="number" inputmode="decimal" min="1" max="1000" step="0.5" placeholder="Ex. 20" data-field="surface" value="' + (state.surface > 0 ? state.surface : "") + '"></label>' +
+      '<div class="ct-chips">' + chips + "</div>" +
       '<label class="ct-field"><span>Marge de chute / découpes (%)</span><input type="range" min="0" max="25" step="1" data-field="chutePct" value="' + state.chutePct + '"><output data-live="chutePct">' + state.chutePct + "%</output></label>" +
       '<label class="ct-checkbox"><input type="checkbox" data-field="covered" ' + (state.covered ? "checked" : "") + '> Terrasse couverte ou semi-abritée (véranda, pergola pleine, balcon couvert...)</label>' +
       "</div>";
@@ -388,11 +422,19 @@
 
     Object.keys(parCategorie).forEach(function (cat) {
       html += '<h4 class="ct-cat-title">' + esc(cat) + "</h4>";
-      html += '<div class="ct-table-wrap"><table class="ct-table"><thead><tr><th>Désignation</th><th>Réf.</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead><tbody>';
+      // Les data-label alimentent la bascule en cartes sous 640px (voir CSS) :
+      // une seule structure, aucun contenu dupliqué, aucun scroll horizontal.
+      html += '<table class="ct-table"><thead><tr><th>Désignation</th><th>Réf.</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead><tbody>';
       parCategorie[cat].forEach(function (l) {
-        html += "<tr><td>" + esc(l.designation) + "</td><td>" + esc(codeLabel(l.code)) + "</td><td>" + l.quantite + " " + esc(l.unite) + "</td><td>" + fmt(l.prixUnitaire) + "</td><td>" + fmt(l.prixTotal) + "</td></tr>";
+        html += "<tr>" +
+          "<td>" + esc(l.designation) + "</td>" +
+          '<td data-label="Réf.">' + esc(codeLabel(l.code)) + "</td>" +
+          '<td data-label="Qté">' + l.quantite + " " + esc(l.unite) + "</td>" +
+          '<td data-label="Prix unitaire">' + fmt(l.prixUnitaire) + "</td>" +
+          '<td data-label="Total">' + fmt(l.prixTotal) + "</td>" +
+          "</tr>";
       });
-      html += "</tbody></table></div>";
+      html += "</tbody></table>";
     });
 
     html += '<p class="ct-total">Total estimatif : <strong>' + fmt(r.total) + "</strong></p>";
@@ -403,12 +445,22 @@
 
   function renderStep5(state) {
     if (state.submitted) {
+      var corps;
+      if (state.sendResult === "endpoint") {
+        corps = "<p>Votre demande a bien été transmise à un conseiller Silvadec. Vous serez recontacté sous 48 h ouvrées.</p>";
+      } else {
+        // Repli mailto : en iframe et sur mobile, l'ouverture automatique échoue
+        // souvent, le lien explicite est donc mis en avant et non en note de bas.
+        corps = "<p>Votre messagerie a dû s'ouvrir avec un email pré-rempli à destination de <strong>" + esc(state.lastContactEmail) + "</strong> : il ne vous reste qu'à cliquer sur Envoyer.</p>" +
+          '<p><a class="ct-btn ct-btn--secondary" href="' + esc(state.lastMailto) + '">Rien ne s\'est ouvert ? Ouvrir l\'email</a></p>';
+      }
       return '<div class="ct-panel ct-confirmation">' +
-        "<h3>Merci !</h3>" +
-        "<p>Votre messagerie a dû s'ouvrir avec un email pré-rempli à destination de <strong>" + esc(state.lastContactEmail) + "</strong> : il ne vous reste qu'à cliquer sur Envoyer.</p>" +
-        '<p class="ct-hint">Rien ne s\'est ouvert ? <a href="' + esc(state.lastMailto) + '">Cliquez ici pour ouvrir l\'email</a>.</p>' +
-        '<button type="button" class="ct-btn ct-btn--secondary" data-action="reset">Faire une nouvelle simulation</button>' +
+        "<h3>Merci !</h3>" + corps +
+        '<p><button type="button" class="ct-btn ct-btn--tertiary" data-action="reset">Faire une nouvelle simulation</button></p>' +
         "</div>";
+    }
+    if (state.sending) {
+      return '<div class="ct-panel ct-confirmation"><h3>Envoi en cours…</h3><p class="ct-hint">Merci de patienter quelques secondes.</p></div>';
     }
     var d = state.devis;
     return '<div class="ct-panel"><h3>Recevoir mon devis personnalisé</h3>' +
@@ -426,24 +478,29 @@
       "</div>";
   }
 
-  function renderNav(state) {
+  function renderNav(state, options) {
     var backDisabled = state.step === 1;
     var isLast = state.step === STEP_LABELS.length;
-    var isEstimation = state.step === 4;
     var nav = '<div class="ct-nav">' +
-      '<button type="button" class="ct-btn ct-btn--secondary" data-action="prev" ' + (backDisabled ? "disabled" : "") + ">&larr; Précédent</button>";
+      '<button type="button" class="ct-btn ct-btn--secondary" data-action="prev" ' + (backDisabled ? "disabled" : "") + ">&larr; Précédent</button>" +
+      '<span class="ct-nav__end">';
 
-    if (isEstimation) {
-      nav += '<button type="button" class="ct-btn ct-btn--primary" data-action="submit-devis">Demander un devis</button>' +
-             '<button type="button" class="ct-btn ct-btn--tertiary" data-action="close-widget">Fermer</button>';
+    if (state.step === 4) {
+      // Trois sorties : le devis (conversion), l'impression (sans laisser ses
+      // coordonnées) et la fermeture — pour ne pas enfermer le visiteur.
+      nav += '<button type="button" class="ct-btn ct-btn--tertiary" data-action="print">Imprimer l\'estimation</button>' +
+        '<button type="button" class="ct-btn ct-btn--primary" data-action="goto-step" data-step="5">Demander un devis</button>';
+      if (options.showClose) {
+        nav += '<button type="button" class="ct-btn ct-btn--tertiary" data-action="close-widget">Fermer</button>';
+      }
     } else if (!isLast) {
-      nav += '<button type="button" class="ct-btn ct-btn--primary" data-action="next">Suivant &rarr;</button>';
+      var nextDisabled = state.step === 1 && !(state.surface > 0);
+      nav += '<button type="button" class="ct-btn ct-btn--primary" data-action="next" ' + (nextDisabled ? "disabled" : "") + ">Suivant &rarr;</button>";
     }
-    nav += "</div>";
-    return nav;
+    return nav + "</span></div>";
   }
 
-  function renderShell(state) {
+  function renderShell(state, options) {
     var body;
     if (state.step === 1) body = renderStep1(state);
     else if (state.step === 2) body = renderStep2(state);
@@ -451,11 +508,17 @@
     else if (state.step === 4) body = renderStep4(state);
     else body = renderStep5(state);
 
-    return '<div class="ct-widget">' +
-      '<div class="ct-header"><h2>Calculette Terrasse</h2><p>Estimez en quelques clics les matériaux et le budget de votre future terrasse Silvadec.</p></div>' +
+    // En iframe, la page hôte affiche déjà le titre « La Calculette terrasse » et
+    // son chapô : réafficher les nôtres ferait doublon et coûterait ~80px sur mobile.
+    var header = options.hideHeader ? "" :
+      '<div class="ct-header"><h2>Calculette Terrasse</h2><p>Estimez en quelques clics les matériaux et le budget de votre future terrasse Silvadec.</p></div>';
+
+    return '<div class="ct-widget' + (options.embedded ? " ct-widget--embedded" : "") + '">' +
+      header +
       renderStepper(state) +
+      renderRunningTotal(state) +
       body +
-      (state.submitted ? "" : renderNav(state)) +
+      (state.submitted || state.sending ? "" : renderNav(state, options)) +
       "</div>";
   }
 
@@ -466,8 +529,39 @@
     var instanceId = "ct" + (++instanceCounter);
     var state = defaultState();
 
+    var isFramed = false;
+    try { isFramed = !!global.parent && global.parent !== global; } catch (e) { isFramed = true; }
+    var lastPostedHeight = 0;
+
+    /**
+     * Messages émis vers la page hôte quand le widget tourne en iframe.
+     * Aucune donnée personnelle ne transite jamais par postMessage : les
+     * coordonnées du visiteur partent uniquement vers `quoteEndpoint` (ou le
+     * mailto). L'origine cible reste "*" parce que le widget ne peut pas
+     * connaître l'origine du parent — c'est sans risque tant que le contenu
+     * des messages se limite à une hauteur, un n° d'étape et un montant.
+     */
+    function postToHost(message) {
+      if (!isFramed) return;
+      try { global.parent.postMessage(message, "*"); } catch (e) { /* parent inaccessible */ }
+    }
+
+    function postHeight(force) {
+      if (!isFramed) return;
+      var h = Math.max(
+        document.documentElement.scrollHeight,
+        document.body ? document.body.scrollHeight : 0
+      );
+      if (!force && Math.abs(h - lastPostedHeight) < 2) return;
+      lastPostedHeight = h;
+      postToHost({ type: "silvadec:ct:height", instance: instanceId, height: h });
+    }
+
     function render() {
-      root.innerHTML = renderShell(state);
+      root.innerHTML = renderShell(state, options);
+      // La hauteur est mesurée après que le navigateur a appliqué la mise en page.
+      if (global.requestAnimationFrame) global.requestAnimationFrame(function () { postHeight(false); });
+      else postHeight(false);
     }
 
     function isStepValid(step) {
@@ -478,8 +572,33 @@
     }
 
     function goToStep(n) {
+      var previous = state.step;
       state.step = clamp(n, 1, STEP_LABELS.length);
       render();
+      if (state.step !== previous) {
+        // La page hôte s'en sert pour ramener l'iframe en haut de l'écran : sans
+        // ça, en iframe, changer d'étape ne bouge pas le scroll de la page et le
+        // visiteur se retrouve au milieu de l'étape suivante (surtout sur mobile).
+        postToHost({
+          type: "silvadec:ct:step",
+          instance: instanceId,
+          step: state.step,
+          steps: STEP_LABELS.length,
+          label: STEP_LABELS[state.step - 1]
+        });
+      }
+    }
+
+    // Met à jour les puces de surface sans re-rendre tout le panneau, pour ne pas
+    // faire perdre le focus au champ pendant la frappe.
+    function syncSurfaceUi() {
+      var chips = root.querySelectorAll("[data-action='set-surface']");
+      Array.prototype.forEach.call(chips, function (chip) {
+        var on = parseFloat(chip.getAttribute("data-surface")) === state.surface;
+        chip.classList.toggle("is-selected", on);
+      });
+      var next = root.querySelector("[data-action='next']");
+      if (next) next.disabled = !(state.surface > 0);
     }
 
     function buildQuotePayload() {
@@ -493,10 +612,36 @@
       };
     }
 
+    function finishSubmit(result, payload, mailtoUrl, contactEmail) {
+      state.sending = false;
+      state.submitted = true;
+      state.sendResult = result;
+      state.lastMailto = mailtoUrl;
+      state.lastContactEmail = contactEmail;
+      render();
+      // Signal de conversion pour la page hôte — volontairement sans coordonnées.
+      postToHost({
+        type: "silvadec:ct:quote",
+        instance: instanceId,
+        transport: result,
+        total: payload.total,
+        surface: payload.dimensions.surface
+      });
+      if (result === "mailto") {
+        // En iframe, la navigation mailto: peut être bloquée sans erreur ;
+        // l'écran de confirmation affiche de toute façon le lien explicite.
+        try { global.location.href = mailtoUrl; } catch (e) { /* bloqué par la sandbox */ }
+      }
+    }
+
     function submitDevis() {
       var d = state.devis;
       if (!d.nom || !d.email || d.email.indexOf("@") === -1) {
-        root.querySelector(".ct-panel").insertAdjacentHTML("afterbegin", '<p class="ct-error">Merci de renseigner au minimum votre nom et un email valide.</p>');
+        var panel = root.querySelector(".ct-panel");
+        if (panel && !panel.querySelector(".ct-error")) {
+          panel.insertAdjacentHTML("afterbegin", '<p class="ct-error">Merci de renseigner au minimum votre nom et un email valide.</p>');
+          postHeight(true);
+        }
         return;
       }
       var payload = buildQuotePayload();
@@ -517,11 +662,25 @@
       root.dispatchEvent(evt);
       global.dispatchEvent(evt);
 
-      state.submitted = true;
-      state.lastMailto = mailtoUrl;
-      state.lastContactEmail = contactEmail;
-      render();
-      global.location.href = mailtoUrl;
+      // Envoi serveur si un endpoint est configuré : c'est le seul mode qui
+      // garantisse la réception (le mailto dépend du client mail du visiteur,
+      // souvent absent sur mobile et bloqué en iframe sandboxée).
+      if (options.quoteEndpoint && global.fetch) {
+        state.sending = true;
+        render();
+        global.fetch(options.quoteEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).then(function (res) {
+          finishSubmit(res && res.ok ? "endpoint" : "mailto", payload, mailtoUrl, contactEmail);
+        })["catch"](function () {
+          finishSubmit("mailto", payload, mailtoUrl, contactEmail);
+        });
+        return;
+      }
+
+      finishSubmit("mailto", payload, mailtoUrl, contactEmail);
     }
 
     root.addEventListener("click", function (e) {
@@ -580,12 +739,23 @@
         case "submit-devis":
           submitDevis();
           break;
+        case "set-surface":
+          state.surface = parseFloat(btn.getAttribute("data-surface"));
+          state.perimetre = estimatePerimetre(state.surface);
+          render();
+          break;
+        case "print":
+          // Dans une iframe, window.print() n'imprime que le document du widget :
+          // c'est exactement le récapitulatif voulu (cf. règles @media print).
+          global.print();
+          break;
         case "reset":
           state = defaultState();
           render();
           break;
         case "close-widget":
           root.innerHTML = "";
+          postToHost({ type: "silvadec:ct:close", instance: instanceId });
           break;
       }
     });
@@ -596,7 +766,7 @@
         var v = parseFloat(t.value);
         state.surface = isNaN(v) ? 0 : clamp(v, 0, 2000);
         state.perimetre = estimatePerimetre(state.surface);
-        if (!state.jointTypeTouched) state.jointType = defaultJointType(state.surface);
+        syncSurfaceUi();
       } else if (t.matches('[data-field="perimetre"]')) {
         var vp = parseFloat(t.value);
         state.perimetre = isNaN(vp) ? 0 : clamp(vp, 0, 2000);
@@ -635,6 +805,20 @@
     });
 
     render();
+
+    if (isFramed) {
+      // Le chargement de Montserrat et la rotation de l'écran changent la hauteur
+      // sans qu'aucun render() n'ait lieu : on resynchronise la page hôte.
+      if (global.ResizeObserver && document.body) {
+        new global.ResizeObserver(function () { postHeight(false); }).observe(document.body);
+      }
+      global.addEventListener("load", function () { postHeight(true); });
+      global.addEventListener("resize", function () { postHeight(false); });
+      if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+        document.fonts.ready.then(function () { postHeight(true); });
+      }
+    }
+
     return {
       getState: function () { return JSON.parse(JSON.stringify(state)); },
       destroy: function () { root.innerHTML = ""; }
@@ -650,16 +834,27 @@
     return createInstance(el, options);
   }
 
+  function boolAttr(el, name) {
+    var v = el.getAttribute(name);
+    return v !== null && v !== "false";
+  }
+
   function autoMount() {
     var nodes = document.querySelectorAll("[data-silvadec-calculette-terrasse], #silvadec-calculette-terrasse");
-    nodes.forEach(function (el) {
+    Array.prototype.forEach.call(nodes, function (el) {
       if (el.getAttribute("data-ct-mounted")) return;
       el.setAttribute("data-ct-mounted", "true");
-      mount(el, { contactEmail: el.getAttribute("data-contact-email") || undefined });
+      mount(el, {
+        contactEmail: el.getAttribute("data-contact-email") || undefined,
+        quoteEndpoint: el.getAttribute("data-quote-endpoint") || undefined,
+        hideHeader: boolAttr(el, "data-hide-header"),
+        embedded: boolAttr(el, "data-embedded"),
+        showClose: boolAttr(el, "data-show-close")
+      });
     });
   }
 
-  global.SilvadecCalculetteTerrasse = { mount: mount, VERSION: "1.0.0" };
+  global.SilvadecCalculetteTerrasse = { mount: mount, VERSION: "1.1.0" };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", autoMount);

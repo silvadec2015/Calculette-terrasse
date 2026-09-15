@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Démo — intégration iframe dans la page Silvadec</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap">
+  <style>
+    /* Reconstitution simplifiée de la page fr.silvadec.com/projet-devis/la-calculette-terrasse,
+       uniquement pour vérifier localement le comportement de l'iframe (hauteur,
+       défilement, fermeture) avant de poser le code sur le site de dev. */
+    :root { --navy: #23354b; --lichen: #91ae8f; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Montserrat", Arial, Helvetica, sans-serif; color: var(--navy); background: #fff; }
+    .site-header { background: var(--navy); color: #fff; padding: 18px 24px; font-weight: 700; letter-spacing: 0.08em; }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px 80px; }
+    .breadcrumb { font-size: 0.8rem; color: #6b7a8d; padding: 18px 0; }
+    .breadcrumb strong { color: var(--lichen); }
+    h1 { font-size: 2.4rem; margin: 20px 0 24px; }
+    .chapo { max-width: 860px; line-height: 1.6; margin-bottom: 28px; }
+    .chapo a { color: var(--navy); font-weight: 700; }
+    /* Le conteneur de la calculette, tel qu'il existe sur la page actuelle. */
+    #silvadec-calculette-terrasse { max-width: 940px; margin: 0 auto; border: 2px solid #f0a92a; border-radius: 6px; }
+    .after { margin-top: 60px; color: #6b7a8d; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">SILVADEC</div>
+  <div class="wrap">
+    <p class="breadcrumb">Accueil › <strong>La Calculette Terrasse</strong></p>
+    <h1>La Calculette terrasse</h1>
+    <p class="chapo">
+      Besoin d'une estimation rapide ? La calculette vous livre instantanément la liste
+      des éléments pour votre projet. Pour concevoir votre terrasse dans le détail —
+      calepinage, optimisation des chutes, export prêt à l'emploi — notre
+      <a href="#">configurateur terrasse nouvelle génération</a> est là pour vous,
+      gratuitement et sans inscription.
+    </p>
+
+    <!-- ↓↓↓ LE CODE À COPIER SUR LA PAGE SILVADEC ↓↓↓ -->
+    <div id="silvadec-calculette-terrasse"></div>
+    <script src="embed.js" defer></script>
+    <!-- ↑↑↑ FIN DU CODE À COPIER ↑↑↑ -->
+
+    <p class="after">
+      Contenu placé après la calculette : il doit rester collé au widget quelle que
+      soit l'étape affichée. Si un grand vide apparaît ici, la synchronisation de
+      hauteur ne fonctionne pas.
+    </p>
+  </div>
+
+  <script>
+    // Faux dataLayer pour visualiser les événements analytics remontés par embed.js.
+    window.dataLayer = window.dataLayer || [];
+    var push = window.dataLayer.push.bind(window.dataLayer);
+    window.dataLayer.push = function (o) { console.log("dataLayer →", o); return push(o); };
+  </script>
+</body>
+</html>

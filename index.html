@@ -3,13 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Calculette Terrasse Silvadec</title>
+  <title>Calculette Terrasse Silvadec — démo injection directe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap">
   <link rel="stylesheet" href="src/calculette-terrasse.css">
   <style>
-    body { margin: 0; padding: 32px 16px; background: #f4f6f4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { margin: 0; padding: 32px 16px; background: #f4f6f4; font-family: "Montserrat", Arial, Helvetica, sans-serif; color: #23354b; }
+    .demo-links { max-width: 900px; margin: 0 auto 20px; font-size: 0.85rem; }
+    .demo-links a { color: #587455; }
   </style>
 </head>
 <body>
+  <p class="demo-links">
+    Démo injection directe — voir aussi
+    <a href="demo-iframe.html">la démo d'intégration en iframe</a>.
+  </p>
+
   <div id="silvadec-calculette-terrasse" data-contact-email="question@silvadec.com"></div>
 
   <script src="src/data.js"></script>
