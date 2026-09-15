@@ -186,25 +186,24 @@
               id: "brossee",
               nom: "Brossée",
               couleurs: [
+                // Références issues du tableau produits « NUANCES BY SILVADEC ».
                 { id: "nuances-ipe", nom: "Nuances Ipé", hex: "#5a3a26", code: "B0035", prix: 69.42 },
-                { id: "chene-clair", nom: "Chêne clair", hex: "#c9a876", code: "D0373", prix: 69.42 },
-                // Nuances Acacia : tarifé comme Chêne clair. Codes article à confirmer
-                // au prochain tarif Silvadec (laisser vide affiche « à confirmer »).
-                { id: "nuances-acacia", nom: "Nuances Acacia", hex: "#c39a62", code: "", prix: 69.42 }
+                { id: "chene-clair", nom: "Nuances Chêne Clair", hex: "#c9a876", code: "D0373", prix: 69.42 },
+                { id: "nuances-acacia", nom: "Nuances Acacia", hex: "#c39a62", code: "F0109", prix: 69.42 }
               ]
             }
           ],
           plancheFinition: [
-            { id: "nuances-ipe", code: "B0038", prix: 79.38 },
-            { id: "chene-clair", code: "D0374", prix: 79.38 },
-            { id: "nuances-acacia", code: "", prix: 79.38 }
+            { id: "nuances-ipe", code: "F0232", prix: 79.38 },
+            { id: "chene-clair", code: "F0233", prix: 79.38 },
+            { id: "nuances-acacia", code: "F0112", prix: 79.38 }
           ]
         }
       ],
       jupe: [
         { id: "nuances-ipe", code: "B0037", prix: 25.20 },
         { id: "chene-clair", code: "D0369", prix: 25.20 },
-        { id: "nuances-acacia", code: "", prix: 25.20 }
+        { id: "nuances-acacia", code: "F0111", prix: 25.20 }
       ]
     }
   ];
@@ -229,6 +228,31 @@
     { id: "silvanet", nom: "Silvanet — traces de pollution et végétaux (1 L)", code: "SINET1201", prix: 33.19 },
     { id: "antimousse", nom: "Antimousse SILVAction (5 L)", code: "SINET1801", prix: 27.15 }
   ];
+
+  /** Qualification du demandeur, transmise au CRM pour router la demande. */
+  var TYPES_DEMANDEUR = [
+    { id: "particulier", nom: "Particulier" },
+    { id: "distributeur", nom: "Distributeur / négoce" },
+    { id: "prescripteur", nom: "Prescripteur (architecte, paysagiste, bureau d'études)" },
+    { id: "autre", nom: "Autre" }
+  ];
+
+  /**
+   * Mentions RGPD affichées avec le formulaire de devis et jointes au payload
+   * transmis au CRM (preuve de consentement horodatée).
+   * `politiqueUrl` : à renseigner avec l'URL de la politique de confidentialité
+   * Silvadec pour qu'un lien s'affiche sous le formulaire.
+   */
+  var RGPD = {
+    responsable: "Silvadec",
+    // Rédigé à la première personne : la phrase s'insère dans « J'accepte que
+    // Silvadec utilise les informations ci-dessus pour … ».
+    finalite: "traiter ma demande de devis et me recontacter à ce sujet",
+    destinataires: "les équipes Silvadec uniquement, sans transmission à des tiers",
+    dureeConservationMois: 36,
+    contactDroits: "question@silvadec.com",
+    politiqueUrl: ""
+  };
 
   /**
    * Règles de calepinage issues de la notice de montage Silvadec PU 7V27 (12/2025) :
@@ -258,6 +282,8 @@
     fixations: FIXATIONS,
     grilleVentilation: GRILLE_VENTILATION,
     entretien: ENTRETIEN,
+    typesDemandeur: TYPES_DEMANDEUR,
+    rgpd: RGPD,
     regles: REGLES,
     meta: {
       tarif: "Tarif public Silvadec 2026, TTC France métropolitaine, éco-participation incluse",

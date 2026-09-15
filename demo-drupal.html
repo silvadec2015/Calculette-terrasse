@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Démo — composant Iframe Drupal (URL + hauteur, sans script)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap">
+  <style>
+    :root { --navy: #23354b; --lichen: #91ae8f; }
+    body { margin: 0; font-family: "Montserrat", Arial, Helvetica, sans-serif; color: var(--navy); }
+    .site-header { background: var(--navy); color: #fff; padding: 18px 24px; font-weight: 700; letter-spacing: 0.08em; }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px 80px; }
+    .breadcrumb { font-size: 0.8rem; color: #6b7a8d; padding: 18px 0; }
+    .breadcrumb strong { color: var(--lichen); }
+    h1 { font-size: 2.4rem; margin: 20px 0 24px; }
+    .chapo { max-width: 860px; line-height: 1.6; margin-bottom: 28px; }
+    .after { margin-top: 60px; color: #6b7a8d; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">SILVADEC</div>
+  <div class="wrap">
+    <p class="breadcrumb">Accueil › <strong>La Calculette Terrasse</strong></p>
+    <h1>La Calculette terrasse</h1>
+    <p class="chapo">
+      Besoin d'une estimation rapide ? La calculette vous livre instantanément la liste
+      des éléments pour votre projet.
+    </p>
+
+    <!-- Ce que génère le composant « Iframe » de Drupal à partir des champs
+         « Iframe URL » et « Iframe height » : une iframe nue, hauteur fixe,
+         aucun script sur la page.
+
+         Comme embed.html est servi depuis la MÊME origine que cette page, le
+         widget accède à window.frameElement et corrige lui-même la hauteur :
+         la valeur saisie dans « Iframe height » ne sert que d'amorce. -->
+    <iframe src="embed.html" width="100%" height="520" frameborder="0"
+            title="Calculette Terrasse Silvadec"></iframe>
+
+    <p class="after">
+      Contenu placé après la calculette : il doit rester collé au widget à chaque
+      étape, sans grand vide ni ascenseur à l'intérieur du cadre.
+    </p>
+  </div>
+</body>
+</html>

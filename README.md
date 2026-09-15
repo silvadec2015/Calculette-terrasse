@@ -14,7 +14,8 @@ montage lames de terrasse 138 et 180×23mm (PU 7V27, 12/2025)**.
 
 ```
 index.html                      démo / page de test locale (injection directe)
-demo-iframe.html                démo reproduisant la page Silvadec pour tester l'iframe
+demo-drupal.html                démo du composant Drupal : iframe nue, sans script
+demo-iframe.html                démo de l'intégration div + script (autre domaine)
 embed.html                      document chargé dans l'iframe (police + widget)
 embed.js                        à poser sur le site : crée l'iframe et la synchronise
 src/data.js                     catalogue produits + tarifs + règles de calepinage
@@ -66,6 +67,30 @@ reste indexable, et n'a pas de problème de hauteur d'iframe à gérer.
 
 ### 3. Dans une iframe (mode retenu pour fr.silvadec.com)
 
+#### 3a. Composant « Iframe » de Drupal — le plus simple
+
+Le composant Drupal ne demande que deux valeurs :
+
+| Champ du back-office | Valeur |
+| --- | --- |
+| **Iframe URL** | `/sites/default/files/calculette-terrasse/embed.html` |
+| **Iframe height** | `520` |
+| **Embed code** | *(laisser vide)* |
+
+**Condition indispensable : héberger les fichiers sur le domaine du site**
+(`fr.silvadec.com`), pas sur un CDN externe. Le document embarqué est alors en
+*same-origin* et le widget ajuste lui-même la hauteur de sa balise `<iframe>`
+via `window.frameElement` — la valeur « Iframe height » ne sert que d'amorce
+avant le premier rendu, et aucun script n'est à ajouter sur la page.
+
+Si les fichiers devaient être servis depuis un autre domaine, cet accès est
+interdit par le navigateur : il faudrait alors passer par 3b.
+
+`demo-drupal.html` reproduit exactement ce cas (iframe nue, hauteur fixe, aucun
+script) pour le vérifier en local.
+
+#### 3b. Div + script — si les fichiers sont sur un autre domaine
+
 Deux lignes à poser sur la page, à l'endroit où la calculette doit apparaître :
 
 ```html
@@ -115,22 +140,85 @@ vers Google côté visiteur, télécharger les `.woff2` et remplacer le bloc
 
 ## Récupération des demandes de devis
 
-### Mode recommandé : un endpoint serveur
+### Mode cible : Freshsales via un relais côté serveur
 
-Renseigner `data-quote-endpoint` (sur le conteneur, ou `quoteEndpoint` dans
-`mount()`) avec l'URL d'un service de formulaire (Formspree, EmailJS, route
-WordPress…). Le widget y envoie le récapitulatif complet en `POST` JSON et
-affiche « Votre demande a bien été transmise ». En cas d'échec réseau ou de
-réponse non-OK, il retombe automatiquement sur le `mailto` décrit ci-dessous.
+Renseigner `data-quote-endpoint` sur le conteneur de `embed.html` (ou
+`quoteEndpoint` dans `mount()`). Le widget y envoie le récapitulatif complet en
+`POST` JSON et affiche « Votre demande a bien été transmise ». En cas d'échec
+réseau ou de réponse non-OK, il retombe sur le `mailto` décrit plus bas.
 
 ```html
 <div id="silvadec-calculette-terrasse"
-     data-quote-endpoint="https://fr.silvadec.com/wp-json/silvadec/v1/devis-terrasse"></div>
+     data-quote-endpoint="https://fr.silvadec.com/api/devis-terrasse"></div>
 ```
+
+> **La clé d'API Freshsales ne doit jamais figurer dans cet endpoint côté
+> navigateur.** Tout ce que charge la page est lisible par n'importe quel
+> visiteur : une clé posée ici serait publique et permettrait de lire et
+> modifier le CRM. `data-quote-endpoint` doit pointer vers un **relais hébergé
+> par Silvadec** (route Drupal, fonction serverless…) qui, lui seul, détient la
+> clé et appelle l'API Freshsales.
+
+Le relais a trois responsabilités :
+
+1. **Authentifier l'appel à Freshsales** avec la clé stockée côté serveur.
+2. **Filtrer les envois abusifs** : le endpoint est public, il faut au minimum
+   une limitation de débit et un contrôle d'origine (`Origin`/`Referer`).
+3. **Archiver la preuve de consentement** (bloc `consentement` du payload) avec
+   la date de création du lead, pour pouvoir la produire en cas de contrôle.
+
+Mapping suggéré vers un lead Freshsales :
+
+| Payload widget | Champ Freshsales |
+| --- | --- |
+| `contact.nom` | `last_name` (ou découpage prénom/nom) |
+| `contact.email` | `email` |
+| `contact.telephone` | `mobile_number` |
+| `contact.codePostal` | `zipcode` |
+| `contact.typeDemandeurLibelle` | champ personnalisé « Type de demandeur » |
+| `total`, `dimensions.surface` | champs personnalisés (budget estimé, surface) |
+| `produit.*`, `materiaux[]` | note ou champ texte long attaché au lead |
+| `source` | `lead_source` = `calculette-terrasse` |
+| `consentement.*` | champs personnalisés d'audit (date, durée, finalité) |
 
 C'est le seul mode qui garantisse la réception : avec 50 % de visiteurs sur
 mobile et une intégration en iframe, le `mailto` échoue souvent (pas de client
 mail configuré, navigation bloquée par la sandbox).
+
+### Conformité RGPD
+
+Le formulaire de devis met en œuvre :
+
+- **une qualification obligatoire du demandeur** (particulier, distributeur,
+  prescripteur, autre — avec précision libre si « autre ») ;
+- **une case de consentement décochée par défaut**, obligatoire : tant qu'elle
+  n'est pas cochée, aucune donnée n'est émise (ni vers l'endpoint, ni vers le
+  `mailto`, ni via l'événement `silvadec:quote-request`) ;
+- **les mentions d'information** affichées sous le formulaire : responsable,
+  finalité, destinataires (Silvadec seul, sans transmission à des tiers),
+  **conservation 36 mois** à compter du dernier contact, et les droits d'accès,
+  rectification, effacement, opposition, limitation et portabilité avec
+  l'adresse pour les exercer ;
+- **une preuve de consentement horodatée** jointe au payload :
+
+```json
+"consentement": {
+  "accepte": true,
+  "date": "2026-09-15T09:56:21.118Z",
+  "finalite": "traiter ma demande de devis et me recontacter à ce sujet",
+  "destinataires": "les équipes Silvadec uniquement, sans transmission à des tiers",
+  "dureeConservationMois": 36
+}
+```
+
+Ces textes sont centralisés dans `DATA.rgpd` (`src/data.js`) : y renseigner
+`politiqueUrl` fait apparaître un lien vers la politique de confidentialité
+Silvadec sous le formulaire.
+
+Deux points restent à traiter **côté Silvadec**, hors du périmètre du widget :
+la **purge effective à 36 mois** dans Freshsales (le widget déclare la durée, il
+ne peut pas l'appliquer), et la mention de la calculette dans la politique de
+confidentialité du site.
 
 ### Repli : `mailto:`
 

@@ -172,6 +172,12 @@
 .ct-total { text-align: right; font-size: 1.15rem; margin: 16px 0 8px; padding-top: 12px; border-top: 2px solid var(--ct-navy); }
 .ct-total strong { color: var(--ct-navy); font-size: 1.4rem; }
 
+.ct-rgpd { background: var(--ct-navy-tint); border-radius: 8px; padding: 12px 14px; margin: 4px 0 18px; }
+.ct-rgpd .ct-checkbox { margin-bottom: 8px; font-weight: 600; }
+.ct-rgpd__mentions { margin: 0; font-size: 0.75rem; line-height: 1.5; color: var(--ct-muted); }
+.ct-rgpd__mentions strong { color: var(--ct-navy); }
+.ct-rgpd__mentions a { color: var(--ct-lichen-dark); }
+
 .ct-confirmation { text-align: center; padding: 24px 0; }
 .ct-confirmation h3 { font-size: 1.3rem; }
 .ct-confirmation a { color: var(--ct-lichen-dark); }

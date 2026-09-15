@@ -24,6 +24,7 @@
   var EUR = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
   var instanceCounter = 0;
   var DEFAULT_CONTACT_EMAIL = "question@silvadec.com";
+  var VERSION = "1.2.0";
 
   function fmt(n) { return EUR.format(round2(n)); }
   // Un coloris récent peut ne pas encore avoir de code article au tarif en vigueur.
@@ -101,7 +102,12 @@
       habillage: "jupe",
       ventilation: false,
       entretien: [],
-      devis: { nom: "", email: "", telephone: "", codePostal: "", message: "" }
+      devis: {
+        typeDemandeur: "",
+        typeDemandeurAutre: "",
+        nom: "", email: "", telephone: "", codePostal: "", message: "",
+        consentement: false
+      }
     };
   }
 
@@ -463,9 +469,22 @@
       return '<div class="ct-panel ct-confirmation"><h3>Envoi en cours…</h3><p class="ct-hint">Merci de patienter quelques secondes.</p></div>';
     }
     var d = state.devis;
-    return '<div class="ct-panel"><h3>Recevoir mon devis personnalisé</h3>' +
+    var rgpd = DATA.rgpd;
+
+    var types = DATA.typesDemandeur.map(function (t) {
+      var sel = d.typeDemandeur === t.id;
+      return '<button type="button" class="ct-toggle__btn' + (sel ? " is-selected" : "") + '" data-action="select-demandeur" data-demandeur="' + esc(t.id) + '">' + esc(t.nom) + "</button>";
+    }).join("");
+
+    var html = '<div class="ct-panel"><h3>Recevoir mon devis personnalisé</h3>' +
       '<p class="ct-hint">Ces informations sont transmises à un conseiller Silvadec pour affiner votre devis.</p>' +
-      '<div class="ct-field-row">' +
+      '<div class="ct-field"><span>Vous êtes *</span><div class="ct-toggle">' + types + "</div></div>";
+
+    if (d.typeDemandeur === "autre") {
+      html += '<label class="ct-field"><span>Précisez *</span><input type="text" data-devis="typeDemandeurAutre" value="' + esc(d.typeDemandeurAutre) + '" placeholder="Ex. collectivité, bureau de contrôle…"></label>';
+    }
+
+    html += '<div class="ct-field-row">' +
       '<label class="ct-field"><span>Nom *</span><input type="text" data-devis="nom" value="' + esc(d.nom) + '" required></label>' +
       '<label class="ct-field"><span>Email *</span><input type="email" data-devis="email" value="' + esc(d.email) + '" required></label>' +
       "</div>" +
@@ -473,9 +492,23 @@
       '<label class="ct-field"><span>Téléphone</span><input type="tel" data-devis="telephone" value="' + esc(d.telephone) + '"></label>' +
       '<label class="ct-field"><span>Code postal</span><input type="text" data-devis="codePostal" value="' + esc(d.codePostal) + '"></label>' +
       "</div>" +
-      '<label class="ct-field"><span>Message (optionnel)</span><textarea data-devis="message" rows="3">' + esc(d.message) + "</textarea></label>" +
-      '<button type="button" class="ct-btn ct-btn--primary" data-action="submit-devis">Envoyer ma demande de devis</button>' +
+      '<label class="ct-field"><span>Message (optionnel)</span><textarea data-devis="message" rows="3">' + esc(d.message) + "</textarea></label>";
+
+    // Information et recueil du consentement (RGPD). Le consentement est horodaté
+    // et joint au payload transmis au CRM, pour pouvoir en apporter la preuve.
+    html += '<div class="ct-rgpd">' +
+      '<label class="ct-checkbox"><input type="checkbox" data-devis="consentement" ' + (d.consentement ? "checked" : "") + ">" +
+      "<span>J'accepte que " + esc(rgpd.responsable) + " utilise les informations ci-dessus pour " + esc(rgpd.finalite) + ". *</span></label>" +
+      '<p class="ct-rgpd__mentions">Destinataires : ' + esc(rgpd.destinataires) + ". " +
+      "Vos données sont conservées <strong>" + rgpd.dureeConservationMois + " mois</strong> à compter du dernier contact, puis supprimées. " +
+      "Vous disposez d'un droit d'accès, de rectification, d'effacement, d'opposition, de limitation et de portabilité, " +
+      'que vous pouvez exercer à <a href="mailto:' + esc(rgpd.contactDroits) + '">' + esc(rgpd.contactDroits) + "</a>." +
+      (rgpd.politiqueUrl ? ' <a href="' + esc(rgpd.politiqueUrl) + '" target="_blank" rel="noopener">Politique de confidentialité</a>.' : "") +
+      "</p></div>";
+
+    html += '<button type="button" class="ct-btn ct-btn--primary" data-action="submit-devis">Envoyer ma demande de devis</button>' +
       "</div>";
+    return html;
   }
 
   function renderNav(state, options) {
@@ -546,6 +579,26 @@
       try { global.parent.postMessage(message, "*"); } catch (e) { /* parent inaccessible */ }
     }
 
+    /**
+     * Redimensionne directement la balise <iframe> qui nous contient.
+     * Ne fonctionne que si le document embarqué est servi depuis la MÊME origine
+     * que la page hôte — dans ce cas l'intégration ne demande aucun script côté
+     * page, ce qui permet d'utiliser un composant CMS « URL + hauteur » tel quel
+     * (Drupal, WordPress…). Sinon l'accès lève une erreur et on retombe sur
+     * postMessage, géré par embed.js.
+     */
+    function resizeOwnFrame(height) {
+      try {
+        var frame = global.frameElement;
+        if (!frame) return false;
+        frame.style.height = height + "px";
+        frame.setAttribute("scrolling", "no");
+        return true;
+      } catch (e) {
+        return false; // iframe cross-origin : postMessage prend le relais
+      }
+    }
+
     function postHeight(force) {
       if (!isFramed) return;
       var h = Math.max(
@@ -554,6 +607,7 @@
       );
       if (!force && Math.abs(h - lastPostedHeight) < 2) return;
       lastPostedHeight = h;
+      resizeOwnFrame(h);
       postToHost({ type: "silvadec:ct:height", instance: instanceId, height: h });
     }
 
@@ -576,9 +630,16 @@
       state.step = clamp(n, 1, STEP_LABELS.length);
       render();
       if (state.step !== previous) {
-        // La page hôte s'en sert pour ramener l'iframe en haut de l'écran : sans
-        // ça, en iframe, changer d'étape ne bouge pas le scroll de la page et le
-        // visiteur se retrouve au milieu de l'étape suivante (surtout sur mobile).
+        // En same-origin, on repositionne nous-mêmes la page hôte ; sinon c'est
+        // embed.js qui le fait à la réception du message. Sans ça, en iframe,
+        // changer d'étape ne bouge pas le scroll de la page et le visiteur se
+        // retrouve au milieu de l'étape suivante (surtout sur mobile).
+        try {
+          var frame = global.frameElement;
+          if (frame && frame.getBoundingClientRect().top < 0) {
+            frame.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        } catch (e) { /* cross-origin : embed.js s'en charge */ }
         postToHost({
           type: "silvadec:ct:step",
           instance: instanceId,
@@ -603,12 +664,34 @@
 
     function buildQuotePayload() {
       var r = compute(state);
+      var d = state.devis;
+      var type = DATA.typesDemandeur.filter(function (t) { return t.id === d.typeDemandeur; })[0];
       return {
+        source: "calculette-terrasse",
+        version: VERSION,
+        dateDemande: new Date().toISOString(),
         dimensions: { surface: r.surface, perimetreEstime: state.perimetre, terrasseCouverte: state.covered },
         produit: { gamme: r.gamme.nom, largeurMm: state.largeurMm, finition: r.finition.nom, couleur: r.couleur.nom, code: r.couleur.code },
         materiaux: r.lignes,
         total: r.total,
-        contact: state.devis
+        contact: {
+          typeDemandeur: d.typeDemandeur,
+          typeDemandeurLibelle: type ? type.nom : "",
+          typeDemandeurAutre: d.typeDemandeur === "autre" ? d.typeDemandeurAutre : "",
+          nom: d.nom,
+          email: d.email,
+          telephone: d.telephone,
+          codePostal: d.codePostal,
+          message: d.message
+        },
+        // Preuve de consentement horodatée, à conserver côté CRM avec la demande.
+        consentement: {
+          accepte: d.consentement === true,
+          date: new Date().toISOString(),
+          finalite: DATA.rgpd.finalite,
+          destinataires: DATA.rgpd.destinataires,
+          dureeConservationMois: DATA.rgpd.dureeConservationMois
+        }
       };
     }
 
@@ -634,12 +717,25 @@
       }
     }
 
-    function submitDevis() {
+    function validationError() {
       var d = state.devis;
-      if (!d.nom || !d.email || d.email.indexOf("@") === -1) {
+      if (!d.typeDemandeur) return "Merci d'indiquer si vous êtes un particulier, un distributeur, un prescripteur ou autre.";
+      if (d.typeDemandeur === "autre" && !d.typeDemandeurAutre.trim()) return "Merci de préciser votre qualité.";
+      if (!d.nom.trim()) return "Merci de renseigner votre nom.";
+      if (!d.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) return "Merci de renseigner un email valide.";
+      // Sans consentement, aucune donnée ne part : c'est la base légale du traitement.
+      if (!d.consentement) return "Merci d'accepter l'utilisation de vos données pour traiter votre demande de devis.";
+      return null;
+    }
+
+    function submitDevis() {
+      var message = validationError();
+      if (message) {
         var panel = root.querySelector(".ct-panel");
-        if (panel && !panel.querySelector(".ct-error")) {
-          panel.insertAdjacentHTML("afterbegin", '<p class="ct-error">Merci de renseigner au minimum votre nom et un email valide.</p>');
+        if (panel) {
+          var existing = panel.querySelector(".ct-error");
+          if (existing) existing.textContent = message;
+          else panel.insertAdjacentHTML("afterbegin", '<p class="ct-error">' + esc(message) + "</p>");
           postHeight(true);
         }
         return;
@@ -739,6 +835,10 @@
         case "submit-devis":
           submitDevis();
           break;
+        case "select-demandeur":
+          state.devis.typeDemandeur = btn.getAttribute("data-demandeur");
+          render();
+          break;
         case "set-surface":
           state.surface = parseFloat(btn.getAttribute("data-surface"));
           state.perimetre = estimatePerimetre(state.surface);
@@ -775,13 +875,17 @@
         var out = root.querySelector('[data-live="chutePct"]');
         if (out) out.textContent = state.chutePct + "%";
       } else if (t.matches("[data-devis]")) {
-        state.devis[t.getAttribute("data-devis")] = t.value;
+        // La case de consentement est un checkbox : lire .checked, pas .value.
+        state.devis[t.getAttribute("data-devis")] = t.type === "checkbox" ? t.checked : t.value;
       }
     });
 
     root.addEventListener("change", function (e) {
       var t = e.target;
-      if (t.matches('[data-field="covered"]')) {
+      if (t.matches('[data-devis]') && t.type === "checkbox") {
+        // Filet pour les navigateurs qui n'émettraient pas "input" sur un checkbox.
+        state.devis[t.getAttribute("data-devis")] = t.checked;
+      } else if (t.matches('[data-field="covered"]')) {
         state.covered = t.checked;
         var gamme = getGamme(state.gammeId);
         if (state.covered && gamme.usage === "exterieur") {
@@ -854,7 +958,7 @@
     });
   }
 
-  global.SilvadecCalculetteTerrasse = { mount: mount, VERSION: "1.1.0" };
+  global.SilvadecCalculetteTerrasse = { mount: mount, VERSION: VERSION };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", autoMount);
