@@ -97,7 +97,7 @@ formulaire tiers (Formspree, EmailJS, endpoint WordPress, etc.) via
 
 Toutes les données commerciales sont dans `src/data.js` :
 
-- `gammes` : une entrée par gamme (Élégance, Émotion, Atmosphère, Atmosphère
+- `gammes` : une entrée par gamme (Élégance, Atmosphère, Atmosphère
   Nuances), avec par largeur de lame (138/180mm) les finitions, les coloris,
   le code article et le prix TTC de chaque lame de 4m, ainsi que les
   planches de finition associées.

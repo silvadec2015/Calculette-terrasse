@@ -108,32 +108,6 @@
       ]
     },
     {
-      id: "emotion",
-      nom: "Émotion",
-      accroche: "Composite monoextrudé, teintes chaudes",
-      usage: "exterieur",
-      largeurs: [
-        {
-          mm: 138,
-          finitions: [
-            {
-              id: "standard",
-              nom: "Standard",
-              couleurs: [
-                { id: "brun-savane", nom: "Brun Savane", hex: "#a9885c", code: "SILAM0901L4", prix: 52.13 },
-                { id: "brun-equateur", nom: "Brun Équateur", hex: "#6e4a2e", code: "SILAM0902L4", prix: 52.13 }
-              ]
-            }
-          ],
-          plancheFinition: []
-        }
-      ],
-      jupe: [
-        { id: "brun-savane", code: "SIJUP1001", prix: 18.94 },
-        { id: "brun-equateur", code: "SIJUP1002", prix: 18.94 }
-      ]
-    },
-    {
       id: "atmosphere",
       nom: "Atmosphère",
       accroche: "Composite coextrudé brossé, couleur stable et garantie",
@@ -213,19 +187,24 @@
               nom: "Brossée",
               couleurs: [
                 { id: "ipe", nom: "Ipé brossé", hex: "#5a3a26", code: "B0035", prix: 69.42 },
-                { id: "chene-clair", nom: "Chêne clair", hex: "#c9a876", code: "D0373", prix: 69.42 }
+                { id: "chene-clair", nom: "Chêne clair", hex: "#c9a876", code: "D0373", prix: 69.42 },
+                // Nuances Acacia : tarifé comme Chêne clair. Codes article à confirmer
+                // au prochain tarif Silvadec (laisser vide affiche « à confirmer »).
+                { id: "nuances-acacia", nom: "Nuances Acacia", hex: "#c39a62", code: "", prix: 69.42 }
               ]
             }
           ],
           plancheFinition: [
             { id: "ipe", code: "B0038", prix: 79.38 },
-            { id: "chene-clair", code: "D0374", prix: 79.38 }
+            { id: "chene-clair", code: "D0374", prix: 79.38 },
+            { id: "nuances-acacia", code: "", prix: 79.38 }
           ]
         }
       ],
       jupe: [
         { id: "ipe", code: "B0037", prix: 25.20 },
-        { id: "chene-clair", code: "D0369", prix: 25.20 }
+        { id: "chene-clair", code: "D0369", prix: 25.20 },
+        { id: "nuances-acacia", code: "", prix: 25.20 }
       ]
     }
   ];

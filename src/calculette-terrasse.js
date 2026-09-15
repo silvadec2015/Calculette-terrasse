@@ -26,6 +26,8 @@
   var DEFAULT_CONTACT_EMAIL = "question@silvadec.com";
 
   function fmt(n) { return EUR.format(round2(n)); }
+  // Un coloris récent peut ne pas encore avoir de code article au tarif en vigueur.
+  function codeLabel(code) { return code ? code : "à confirmer"; }
   function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
   function clamp(n, min, max) { return Math.min(Math.max(n, min), max); }
   function esc(s) {
@@ -56,12 +58,12 @@
       "",
       "Surface : " + d.surface + " m²",
       "Terrasse couverte / abritée : " + (d.terrasseCouverte ? "oui" : "non"),
-      "Produit : " + p.gamme + " " + p.finition + " " + p.largeurMm + "mm " + p.couleur + " (" + p.code + ")",
+      "Produit : " + p.gamme + " " + p.finition + " " + p.largeurMm + "mm " + p.couleur + " (" + codeLabel(p.code) + ")",
       "",
       "Matériel estimé :"
     ];
     payload.materiaux.forEach(function (l) {
-      lines.push("- " + l.quantite + " " + l.unite + " " + l.designation + " (" + l.code + ") — " + fmt(l.prixTotal));
+      lines.push("- " + l.quantite + " " + l.unite + " " + l.designation + " (" + codeLabel(l.code) + ") — " + fmt(l.prixTotal));
     });
     lines.push("");
     lines.push("Total estimatif : " + fmt(payload.total));
@@ -397,7 +399,7 @@
       html += '<h4 class="ct-cat-title">' + esc(cat) + "</h4>";
       html += '<div class="ct-table-wrap"><table class="ct-table"><thead><tr><th>Désignation</th><th>Réf.</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead><tbody>';
       parCategorie[cat].forEach(function (l) {
-        html += "<tr><td>" + esc(l.designation) + "</td><td>" + esc(l.code) + "</td><td>" + l.quantite + " " + esc(l.unite) + "</td><td>" + fmt(l.prixUnitaire) + "</td><td>" + fmt(l.prixTotal) + "</td></tr>";
+        html += "<tr><td>" + esc(l.designation) + "</td><td>" + esc(codeLabel(l.code)) + "</td><td>" + l.quantite + " " + esc(l.unite) + "</td><td>" + fmt(l.prixUnitaire) + "</td><td>" + fmt(l.prixTotal) + "</td></tr>";
       });
       html += "</tbody></table></div>";
     });
