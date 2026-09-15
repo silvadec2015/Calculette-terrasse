@@ -379,11 +379,6 @@
 
     html += '<p class="ct-hint">Lambourdes composite : gris anthracite standard</p>';
 
-    if (perimetreNecessaire) {
-      html += '<label class="ct-field"><span>Périmètre de la terrasse (m)</span><input type="number" min="1" max="400" step="0.1" data-field="perimetre" value="' + state.perimetre + '"></label>' +
-        '<p class="ct-hint">Estimé automatiquement pour une terrasse carrée d\'environ ' + round2(Math.sqrt(state.surface)) + ' m de côté à partir de votre surface. Ajustez cette valeur si votre terrasse est plus rectangulaire, pour un habillage/une ventilation plus précis.</p>';
-    }
-
     html += '<div class="ct-field"><span>Type de fixation</span><div class="ct-toggle">' +
       '<button type="button" class="ct-toggle__btn' + (state.fixation === "clips" ? " is-selected" : "") + '" data-action="select-fixation" data-fixation="clips">Clips inox (invisible, recommandé)</button>' +
       '<button type="button" class="ct-toggle__btn' + (state.fixation === "vis" ? " is-selected" : "") + '" data-action="select-fixation" data-fixation="vis">Vis apparentes</button>' +
@@ -395,7 +390,27 @@
       (hasPlanche ? '<button type="button" class="ct-toggle__btn' + (state.habillage === "planche" ? " is-selected" : "") + '" data-action="select-habillage" data-habillage="planche">Planche de finition (' + state.largeurMm + ' mm)</button>' : "") +
       "</div></div>";
 
-    html += '<label class="ct-checkbox"><input type="checkbox" data-field="ventilation" ' + (state.ventilation ? "checked" : "") + '> Ajouter des grilles de ventilation en périphérie (recommandé)</label>';
+    // Même gabarit que fixation/habillage ci-dessus (plutôt qu'une case à cocher
+    // isolée) : sur les captures reçues, la ventilation passait inaperçue à côté
+    // de ces deux blocs visuellement plus marqués.
+    html += '<div class="ct-field"><span>Grilles de ventilation en périphérie</span><div class="ct-toggle">' +
+      '<button type="button" class="ct-toggle__btn' + (state.ventilation ? " is-selected" : "") + '" data-action="select-ventilation" data-ventilation="oui">Oui (recommandé)</button>' +
+      '<button type="button" class="ct-toggle__btn' + (!state.ventilation ? " is-selected" : "") + '" data-action="select-ventilation" data-ventilation="non">Non</button>' +
+      "</div></div>";
+
+    // Affiché seulement une fois l'habillage/la ventilation choisis, juste après
+    // eux : le champ apparaît dans son contexte plutôt qu'en tête de panneau,
+    // et le texte nomme explicitement ce qu'il sert à chiffrer.
+    if (perimetreNecessaire) {
+      // Tournures partitives ("d'habillage", "de grilles") plutôt que l'article défini
+      // contracté ("des grilles") : ça évite d'avoir à gérer la contraction de/les
+      // selon la combinaison de cas dans une simple concaténation de chaînes.
+      var sertA = state.habillage !== "aucun" && state.ventilation
+        ? "d'habillage périphérique et de grilles de ventilation"
+        : state.ventilation ? "de grilles de ventilation" : "d'habillage périphérique";
+      html += '<label class="ct-field"><span>Périmètre de la terrasse (m)</span><input type="number" min="1" max="400" step="0.1" data-field="perimetre" value="' + state.perimetre + '"></label>' +
+        '<p class="ct-hint">Sert à calculer la quantité ' + sertA + '. Estimé automatiquement pour une terrasse carrée d\'environ ' + round2(Math.sqrt(state.surface)) + ' m de côté à partir de votre surface — ajustez cette valeur si votre terrasse est plus rectangulaire, pour un résultat plus précis.</p>';
+    }
 
     html += '<div class="ct-field"><span>Entretien (optionnel)</span>' +
       DATA.entretien.map(function (e) {
@@ -832,6 +847,10 @@
           state.habillage = btn.getAttribute("data-habillage");
           render();
           break;
+        case "select-ventilation":
+          state.ventilation = btn.getAttribute("data-ventilation") === "oui";
+          render();
+          break;
         case "submit-devis":
           submitDevis();
           break;
@@ -895,9 +914,6 @@
           state.finitionId = lo.finitions[0].id;
           state.couleurId = lo.finitions[0].couleurs[0].id;
         }
-        render();
-      } else if (t.matches('[data-field="ventilation"]')) {
-        state.ventilation = t.checked;
         render();
       } else if (t.matches('[data-field="entretien"]')) {
         var id = t.getAttribute("data-entretien-id");
